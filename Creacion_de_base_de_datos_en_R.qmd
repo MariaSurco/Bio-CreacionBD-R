@@ -1,0 +1,276 @@
+---
+title: "Base de datos simulada para ensayo aleatorizado en R"
+author: "Maria F. Surco V."
+format: html
+editor: visual
+---
+
+# Introducción
+
+El objetivo de este trabajo es poder simular una base de datos de u total de 1000 sujetos para poder simular un ensayo clínico aleatorizado.
+
+# Carga de librerías
+
+**Si los paquetes no están instalados, descargarlos:**
+
+```{r}
+if (!requireNamespace("writexl", quietly = TRUE)) install.packages("writexl")
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+```
+
+```{r}
+library(tidyverse)
+library(writexl)
+```
+
+# Descripción de las variables del estudio
+
+En este problema debemos simular una base de datos correspondiente a un **ensayo clínico aleatorizado** diseñado para evaluar en **1000 individuos** la eficacia de cambiar el horario de las clases de bioestadística de los sábados a los miércoles, con el objetivo de observar si esto mejora las notas del curso.
+
+-   **Desenlace (variable dependiente):**\
+    `nota` — calificación final del curso (rango: 09 a 20).
+
+-   **Exposición principal:**\
+    `lab2` — horario del laboratorio 2 (`0 = sábado`, `1 = miércoles`).
+
+-   **Confusores:**
+
+    -   `procedencia` — lugar de residencia (`0 = Cono Centro`, `1 = Cono Sur`, `2 = Cono Este`, `3 = Cono Norte`).
+    -   `tercio` — nivel de rendimiento académico (`0 = Tercio superior`, `1 = Tercio medio`, `2 = Tercio inferior`).
+    -   `edad` — edad de los participantes (entre 19 y 25 años, siguiendo la distribución de la población peruana).
+    -   `genero` — (`0 = masculino`, `1 = femenino`) con proporciones de 40% y 60% respectivamente.
+
+-   **Tamaño de muestra:**\
+    `n = 1000` estudiantes.
+
+-   **Semilla de reproducibilidad:**\
+    `set.seed(2025)` para asegurar que todos los resultados sean reproducibles (cada vez que se ejecute el script con la misma semilla, se obtendrán exactamente los mismos datos simulados).
+
+------------------------------------------------------------------------
+
+# Creación del código
+
+## Parámetros
+
+### Parámetros de reproducibilidad
+
+```{r}
+set.seed(2025)
+n <- 1000  # Tamaño de muestra
+```
+
+"seed" nos asegura que al momento de correr varias veces nuestro script en nuestra computadora los datos sean los mismos.
+
+### Definición de variables categóricas
+
+```{r}
+
+# Procedencia (4 conos de Lima)
+proc_levels <- c("Cono Centro", "Cono Sur", "Cono Este", "Cono Norte")
+
+# Tercio académico
+tercio_levels <- c("Tercio superior", "Tercio Medio", "Tercio inferior")
+
+# Género
+genero_levels <- c("Masculino", "Femenino")
+genero_prob <- c(0.40, 0.60)  # 40% masculino, 60% femenino
+```
+
+### Distribución de edad
+
+```{r}
+edad_vals <- 19:25
+edad_prob <- c(0.18, 0.22, 0.20, 0.16, 0.12, 0.08, 0.04)  # Mayor concentración en 19-21
+edad_prob <- edad_prob / sum(edad_prob)  # Normalizar
+```
+
+## Paso 1: Generación de confusores
+
+```{r}
+# Procedencia: Exactamente 250 en cada cono (25% cada uno)
+procedencia <- sample(rep(0:3, each = n/4))
+
+# Tercio: Asignación completamente al azar (sin balanceo forzado)
+tercio <- sample(0:2, n, replace = TRUE)
+
+# Género: Exactamente 400 masculino (40%) y 600 femenino (60%)
+genero <- sample(rep(c(0, 1), times = c(n*0.40, n*0.60)))
+
+# Edad: Distribución según población peruana
+edad <- sample(edad_vals, n, replace = TRUE, prob = edad_prob)
+```
+
+## Paso 2: Aleatorización de la exposición (lab2)
+
+Como se quiere trabajar con una aleatorización balancead (500 en cada grupo). El método escogido en este caso es permutación aleatorizada de un vectores balanceado.
+
+```{r}
+lab2 <- sample(rep(c(0, 1), each = n/2))
+```
+
+## Paso 3: Generación del desenlace (nota)
+
+```{r}
+nota <- runif(n, min = 9, max = 20)
+nota <- round(nota, 1)  # Redondear a 1 decimal
+```
+
+## Paso 4: Construcción del dataframe
+
+```{r}
+df_datos <- tibble(
+  id = 1:n,
+  nota = nota,
+  lab2 = lab2,
+  procedencia = procedencia,
+  tercio = tercio,
+  edad = edad,
+  genero = genero
+)
+
+# Data frame con etiquetas descriptivas
+df_etiquetas <- tibble(
+  id = 1:n,
+  nota = nota,
+  lab2 = factor(lab2, levels = c(0, 1), labels = c("Sábado", "Miércoles")),
+  procedencia = factor(procedencia, levels = 0:3, labels = proc_levels),
+  tercio = factor(tercio, levels = 0:2, labels = tercio_levels),
+  edad = edad,
+  genero = factor(genero, levels = c(0, 1), labels = genero_levels)
+)
+```
+
+## Paso 5: Verificación de la calidad de los datos
+
+```{r}
+cat("\n=== RESUMEN DE LA BASE DE DATOS ===\n")
+cat("Total de participantes:", n, "\n\n")
+
+cat("Distribución de exposición (lab2):\n")
+print(table(df_etiquetas$lab2))
+cat("Proporción:", round(prop.table(table(df_etiquetas$lab2)), 3), "\n\n")
+
+cat("Distribución de género:\n")
+print(table(df_etiquetas$genero))
+cat("Proporción:", round(prop.table(table(df_etiquetas$genero)), 3), "\n\n")
+
+cat("Distribución de procedencia:\n")
+print(table(df_etiquetas$procedencia))
+cat("Proporción:", round(prop.table(table(df_etiquetas$procedencia)), 3), "\n\n")
+
+cat("Estadísticas de nota por grupo:\n")
+print(df_etiquetas %>% 
+        group_by(lab2) %>% 
+        summarise(
+          n = n(),
+          media = round(mean(nota), 2),
+          de = round(sd(nota), 2),
+          min = min(nota),
+          max = max(nota)
+        ))
+
+cat("\nDistribución de edad:\n")
+print(table(df_etiquetas$edad))
+
+cat("\nDistribución de tercio:\n")
+print(table(df_etiquetas$tercio))
+
+cat("\nBalance de variables por grupo de exposición:\n")
+print(df_etiquetas %>% 
+        group_by(lab2) %>% 
+        summarise(
+          edad_media = round(mean(edad), 2),
+          prop_femenino = round(mean(genero == "Femenino"), 3),
+          prop_tercio_superior = round(mean(tercio == "Tercio superior"), 3)
+        ))
+```
+
+## Paso 6:Creación de la hoja de metadata
+
+```{r}
+# Metadata de variables
+metadata_variables <- tibble(
+  Variable = c("id", "nota", "lab2", "procedencia", "tercio", "edad", "genero"),
+  Tipo = c("Entero", "Numérico", "Binario", "Categórico", "Categórico", "Entero", "Binario"),
+  Rango = c("1-1000", "9.0-20.0", "0-1", "0-3", "0-2", "19-25", "0-1"),
+  Descripción = c(
+    "Identificador único del participante",
+    "Nota final del curso de Bioestadística",
+    "Horario del laboratorio 2: 0=Sábado (referencia), 1=Miércoles",
+    "Zona de procedencia: 0=Cono Centro (referencia), 1=Cono Sur, 2=Cono Este, 3=Cono Norte",
+    "Rendimiento académico: 0=Tercio superior (referencia), 1=Tercio Medio, 2=Tercio inferior",
+    "Edad del participante en años cumplidos",
+    "Género: 0=Masculino (referencia), 1=Femenino"
+  ),
+  Rol = c("Identificador", "Desenlace", "Exposición", "Confosor", "Confosor", "Confosor", "Confosor"),
+  Notas = c(
+    "Clave primaria",
+    "Variable continua generada completamente al azar (distribución uniforme 9-20)",
+    "Asignación aleatoria balanceada 1:1 (500 por grupo)",
+    "Distribución balanceada: 25% en cada cono (250 por grupo)",
+    "Asignación completamente al azar (sin balanceo forzado)",
+    "Distribución basada en pirámide poblacional peruana",
+    "Distribución balanceada: 40% masculino (400), 60% femenino (600)"
+  ),
+  Categoría_Referencia = c(
+    "-",
+    "-",
+    "0 (Sábado)",
+    "0 (Cono Centro)",
+    "0 (Tercio superior)",
+    "-",
+    "0 (Masculino)"
+  )
+)
+
+# Información del estudio
+info_estudio <- tibble(
+  Item = c(
+    "Título del estudio",
+    "Objetivo",
+    "Diseño",
+    "Tamaño de muestra",
+    "Desenlace primario",
+    "Exposición",
+    "Confusores",
+    "Aleatorización",
+    "Semilla reproducible",
+    "Software utilizado"
+  ),
+  Detalle = c(
+    "Eficacia de cambiar el horario de Bioestadística",
+    "Evaluar si cambiar las clases de sábado a miércoles mejora las notas",
+    "Ensayo clínico aleatorizado",
+    as.character(n),
+    "Nota final del curso (escala 9-20)",
+    "Horario del laboratorio 2 (Sábado vs Miércoles)",
+    "Procedencia, Tercio académico, Edad, Género",
+    "Aleatorización balanceada 1:1 (500 por grupo)",
+    "2025",
+    paste("R version", R.version$major, ".", R.version$minor, sep = "")
+  )
+)
+```
+
+## Paso 7: Importar a Excel
+
+Con esto terminamos el script, obteniendo satisfactoriamente nuestra base de datos.
+
+```{r}
+
+archivo_salida <- "base_ensayo_clinico_bioestadistica.xlsx"
+
+write_xlsx(
+  list(
+    `1_DATOS_CODIFICADOS` = df_datos,
+    `2_DATOS_ETIQUETADOS` = df_etiquetas,
+    `3_METADATA_VARIABLES` = metadata_variables,
+    `4_INFO_ESTUDIO` = info_estudio
+  ),
+  path = archivo_salida
+)
+
+cat("\n=== ARCHIVO GENERADO EXITOSAMENTE ===\n")
+cat("Archivo:", archivo_salida, "\n")
+
+```
