@@ -54,6 +54,3 @@ install.packages(c('tidyverse', 'writexl'))
 - **Semilla reproducible:** `set.seed(2025)`  
 
 ---
-
-ence #Bioestadística #EnsayoClinico #SimulaciónDeDatos  
-", "README.md")
