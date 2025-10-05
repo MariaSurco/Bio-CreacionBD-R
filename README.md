@@ -14,21 +14,21 @@ El objetivo es generar una muestra de **1000 estudiantes** y evaluar si **cambia
 ---
 
 ## Contenido del repositorio  
-\`\`\`
+```
 📁 /
 ├── base_ensayo_clinico_bioestadistica.qmd   # Script principal en RMarkdown
 ├── base_ensayo_clinico_bioestadistica.xlsx  # Archivo generado con 4 hojas
 └── README.md
-\`\`\`
+```
 
 ---
 
 ## Requisitos  
 Asegúrate de tener instalados los siguientes paquetes antes de ejecutar el script:  
 
-\`\`\`r
+```r
 install.packages(c('tidyverse', 'writexl'))
-\`\`\`
+```
 
 ---
 
